@@ -1,7 +1,7 @@
 package Data::FixedFormat;
 
 use strict;
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 1;
 
 package Data::FixedFormat;
@@ -12,7 +12,7 @@ sub new {
     if (ref $layout eq "HASH") {
 	$self = new Data::FixedFormat::Variants $layout;
     } else {
-	$self = { Names=>[], Count=>[], Format=>"" };
+	$self = { Names=>[], Count=>[], Format=>"", Fields=>{} };
 	bless $self, $class;
 	$self->parse_fields($layout) if $layout;
     }
@@ -21,11 +21,14 @@ sub new {
 
 sub parse_fields {
     my ($self,$fmt) = @_;
+    my $ofs = 0;
     foreach my $fld (@$fmt) {
 	my ($name, $format, $count) = split ':',$fld;
 	push @{$self->{Names}}, $name;
 	push @{$self->{Count}}, $count;
 	$self->{Format} .= $format x ($count || 1);
+        $self->{Fields}{$name} = $ofs;
+        $ofs += ($count || 1);
     }
 }
 
@@ -34,15 +37,17 @@ sub unformat {
     my @flds = unpack $self->{Format}, $frec;
     my $i = 0;
     my $rec = {};
-    foreach my $name (@{$self->{Names}}) {
-	if ($self->{Count}[$i]) {
-	    @{$rec->{$name}} = splice @flds, 0, $self->{Count}[$i];
-	} else {
-	    $rec->{$name} = shift @flds;
-	}
-	$i++;
-    }
+    @{$rec}{@{$self->{Names}}} =
+        map { defined($_) ? [ splice @flds, 0, $_ ] : shift @flds }
+            @{$self->{Count}};
     return $rec;
+}
+
+sub unformat_tied {
+    my ($self,$frec) = @_;
+    my @flds = unpack $self->{Format}, $frec;
+    tie my %h, 'Data::FixedFormat::Tied', $self, \@flds;
+    return \%h;
 }
 
 sub format {
@@ -69,7 +74,71 @@ sub blank {
     return $rec;
 }
 
+package Data::FixedFormat::Tied;
+use strict;
+
+sub TIEHASH {
+    my ($class,$dff,$data) = @_;
+    bless { Dff=>$dff, Data=>$data },$class;
+}
+
+sub FETCH {
+    my ($self,$key) = @_;
+    exists($self->{Dff}{Fields}{$key}) or die "Undefined key: $key";
+    my $idx = $self->{Dff}{Fields}{$key};
+    if ($self->{Dff}{Count}[$idx]) {
+        die "Array fields not yet supported with tied interface";
+    } else {
+        $self->{Data}[$idx];
+    }
+}
+
+sub STORE {
+    my ($self,$key,$value) = @_;
+    exists($self->{Dff}{Fields}{$key}) or die "Undefined key: $key";
+    my $idx = $self->{Dff}{Fields}{$key};
+    if ($self->{Dff}{Count}[$idx]) {
+        die "Array fields not yet supported with tied interface";
+    } else {
+        $self->{Data}[$idx] = $value;
+    }
+}
+
+sub DELETE {
+    my ($self,$key) = @_;
+    die "Not Yet Implemented";
+}
+
+sub CLEAR {
+    my ($self) = @_;
+    die "Not Yet Implemented";
+}
+
+sub EXISTS {
+    my ($self,$key) = @_;
+    exists($self->{Dff}{Fields}{$key});
+}
+
+sub FIRSTKEY {
+    my ($self) = @_;
+    $self->{Dff}{Names}[0];
+}
+
+sub NEXTKEY {
+    my ($self,$lastkey) = @_;
+    $self->{Dff}{Names}[$self->{Dff}{Fields}{$lastkey}+1];
+}
+
+sub UNTIE {
+#    my ($self) = @_;
+}
+
+sub DESTROY {
+#    my ($self) = @_;
+}
+
 package Data::FixedFormat::Variants;
+use strict;
 
 sub new {
     my ($class,$recfmt) = @_;
@@ -85,10 +154,16 @@ sub new {
 sub unformat {
     my ($self,$frec) = @_;
     my $rec = $self->{Layouts}[0]->unformat($frec);
-    if ($self->{Chooser}) {
-	my $w = &{$self->{Chooser}}($rec);
-	$rec = $self->{Layouts}[$w]->unformat($frec) if $w;
-    }
+    my $w = &{$self->{Chooser}}($rec);
+    $rec = $self->{Layouts}[$w]->unformat($frec) if $w;
+    return $rec;
+}
+
+sub unformat_tied {
+    my ($self,$frec) = @_;
+    my $rec = $self->{Layouts}[0]->unformat_tied($frec);
+    my $w = &{$self->{Chooser}}($rec);
+    $rec = $self->{Layouts}[$w]->unformat_tied($frec) if $w;
     return $rec;
 }
 
@@ -98,16 +173,18 @@ sub format {
     if ($self->{Chooser}) {
 	$w = &{$self->{Chooser}}($rec);
     }
-    my $frec = $self->{Layout}[$w]->format($rec);
+    my $frec = $self->{Layouts}[$w]->format($rec);
     return $frec;
 }
 
 sub blank {
     my ($self,$w) = @_;
     $w = 0 unless $w;
-    my $rec = $self->{Layout}[$w]->blank();
+    my $rec = $self->{Layouts}[$w]->blank();
     return $rec;
 }
+
+__END__
 
 =head1 NAME
 
@@ -127,6 +204,9 @@ Data::FixedFormat - convert between fixed-length fields and hashes
 
    # create a hash from the buffer read from the file
    my $hdr = $tarhdr->unformat($buf);   # $hdr gets a hash ref
+
+   # create a tied hash from the buffer
+   my $hdr = $tarhdr->unformat_tied($buf); # $hdr gets a ref to a tied hash
 
    # create a flat record from a hash reference
    my $buf = $tarhdr->format($hdr);     # $hdr is a hash ref
@@ -196,6 +276,13 @@ Fields can now be accessed by name though the hash:
 
     print $hashref->{field-name};
     print $hashref->{array-field}[3];
+
+=head2 unformat_tied
+
+B<unformat_tied> works just like B<unformat> except the returned
+object is a reference to a tied hash.  This could provide large
+performance improvements when referencing only a few fields in complex
+record definitions.  The tied interface does not support arrays.
 
 =head2 format
 
@@ -285,6 +372,11 @@ which fields contain arrays.
 Format contains the template string for the Perl B<pack> and B<unpack>
 functions.
 
+=item Fields
+
+Fields is a hash mapping field names to an index into the list
+returned by B<unpack>.
+
 =back
 
 B<Data::FixedFormat::Variants> is a class that handles variant
@@ -305,6 +397,13 @@ apply to the record.
 =back
 
 =head1 HISTORY
+
+Version 0.03
+
+Added some comprehensive tests.  The tests exposed some bugs and those
+were fixed.
+
+Added the tied interface.
 
 Version 0.02
 
@@ -336,7 +435,7 @@ http://nbpfaus.net/~pfau/.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2000,2002 Thomas Pfau.  All rights reserved.
+Copyright (C) 2000,2002,2007 Thomas Pfau.  All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the

@@ -1,7 +1,7 @@
 Changes
-COPYING
-FixedFormat.pm
-MANIFEST
 Makefile.PL
+MANIFEST
 README
-test.pl
+t/Data-FixedFormat.t
+lib/Data/FixedFormat.pm
+META.yml                                 Module meta-data (added by MakeMaker)

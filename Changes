@@ -1,5 +1,15 @@
 Revision history for Perl extension Data::FixedFormat.
 
+0.03  Mon Feb 12 16:03:46 2007
+	- Wrote extensive tests which exposed some bugs which have
+	  been fixed.
+
+	- Added the tied interface.
+
+	- Created a new shell using h2xs 1.23 with options
+		--f -n Data::FixedFormat --use-new-tests
+		--skip-exporter --skip-autoloader -X
+
 0.02 Sat Aug 17 13:13:00 2002
        - Restructured the class.  The initial implementation used a
          single package for variant and non-variant records.  All

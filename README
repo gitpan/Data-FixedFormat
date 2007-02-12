@@ -1,6 +1,6 @@
-Data::FixedFormat 0.02 -- convert between fixed-length fields and hashes
+Data::FixedFormat 0.03 -- convert between fixed-length fields and hashes
 
-	Copyright (C) 2000,2002 Thomas Pfau.  All rights reserved.
+	Copyright (C) 2000,2002,2007 Thomas Pfau.  All rights reserved.
 
 	This module is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
@@ -87,15 +87,11 @@ the following commands.
 
 History
 
+Version 0.03 provides comprehensive tests, a tied interface, and some
+bug fixes.
+
 Version 0.02 is a major restructuring of the code but the external
 interface has not changed.  Provided you access its functionality
 through its methods and don't poke around on the inside, your code
 should continue to work with this version.  See the document Changes
 for more detailed change information.
-
-Future
-
-I'm thinking of rewriting the hash access as a tied hash interface.
-Instead of actually building a hash, pull the values right out of the
-array returned by unpack.  This might make the code faster if the
-calling code only references a few fields in a record that has many.
