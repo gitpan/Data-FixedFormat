@@ -1,5 +1,9 @@
 Revision history for Perl extension Data::FixedFormat.
 
+0.04  Sat Nov 22 21:45:07 2008
+        - Removed requirement for Perl 5.8.8 from Makefile.PL.  That
+	  was inserted by h2ph and I hadn't noticed it.
+
 0.03  Mon Feb 12 16:03:46 2007
 	- Wrote extensive tests which exposed some bugs which have
 	  been fixed.

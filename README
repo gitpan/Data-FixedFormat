@@ -1,6 +1,6 @@
-Data::FixedFormat 0.03 -- convert between fixed-length fields and hashes
+Data::FixedFormat 0.04 -- convert between fixed-length fields and hashes
 
-	Copyright (C) 2000,2002,2007 Thomas Pfau.  All rights reserved.
+	Copyright (C) 2000,2002,2007,2008 Thomas Pfau.  All rights reserved.
 
 	This module is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
@@ -86,6 +86,9 @@ the following commands.
 	make install
 
 History
+
+Version 0.04 removes the requirement for perl 5.8.8 from Makefile.PL.
+That was inserted by h2ph and I hadn't noticed it.
 
 Version 0.03 provides comprehensive tests, a tied interface, and some
 bug fixes.
